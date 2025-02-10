@@ -127,36 +127,39 @@ def clean_generated_email(email_text: str) -> str:
     return email_text
 
 
-from openai import OpenAI
-
-client = OpenAI()  # Assumes your OPENAI_API_KEY is set in the environment
-
-
 def draft_sms_via_ai(user, lead, message_content):
     """
     Uses the OpenAI Chat API to generate a concise and professional SMS message.
-    The context includes the user's name and brokerage as well as the lead's name.
-    The AI is free to craft a creative message using the provided message content,
-    but it should not invent any additional contact details.
+
+    The SMS message:
+      - Greets the lead by their first name.
+      - Mentions the sender's brokerage using its actual name.
+      - Signs off with the sender's first name.
+      - Incorporates the provided message content.
+
+    No placeholder text (such as [brokerage_name]) or invented contact details should appear.
     """
+    # Extract first names for clarity
+    sender_first_name = user.name.split()[0]
+    lead_first_name = lead.name.split()[0]
+
     messages = [
         {
             "role": "system",
             "content": "You are a professional assistant that drafts concise and creative SMS messages."
         },
         {
-            "role": "developer",
-            "content": (
-                f"Generate an SMS message that includes a friendly greeting using the user's name and brokerage. "
-                f"Address the message to {lead.name} and incorporate the following content: {message_content}. "
-                "Do not invent any additional contact details."
-            )
-        },
-        {
             "role": "user",
-            "content": "Please generate the SMS message."
+            "content": (
+                f"Generate a concise SMS message addressed to {lead_first_name}. "
+                f"Include a friendly greeting and incorporate the following content: {message_content}. "
+                f"Mention the sender's brokerage, {user.brokerage_name}, appropriately. "
+                f"Sign off the message using the sender's first name: {sender_first_name}. "
+                "Do not include any placeholder text such as [brokerage_name] or invent additional contact details."
+            )
         }
     ]
+
     completion = client.chat.completions.create(
         model="gpt-4o",
         temperature=0.4,
@@ -169,9 +172,13 @@ def draft_sms_via_ai(user, lead, message_content):
 def draft_email_message_via_ai(user, lead, message_content):
     """
     Uses the OpenAI Chat API to generate a professional HTML-formatted email message.
-    The email should include a friendly greeting that mentions the user's name and brokerage,
-    address the email to the lead by name, and incorporate the provided message content.
-    The AI should not invent any additional contact details.
+
+    The email should:
+      - Begin with a greeting like: "Hello, this is <b>{user.name}</b> from <b>{user.brokerage_name}</b>."
+      - Address the email to the lead by name.
+      - Incorporate the provided message content.
+
+    Ensure no placeholder text (e.g., [brokerage_name]) is used and do not invent additional contact details.
     """
     messages = [
         {
@@ -179,19 +186,16 @@ def draft_email_message_via_ai(user, lead, message_content):
             "content": "You are a professional email assistant that drafts creative, HTML-formatted email messages."
         },
         {
-            "role": "developer",
+            "role": "user",
             "content": (
-                f"Generate an HTML-formatted email message that begins with a greeting such as: "
+                f"Generate an HTML-formatted email message that begins with a greeting like: "
                 f"'Hello, this is <b>{user.name}</b> from <b>{user.brokerage_name}</b>.' "
                 f"Address the email to {lead.name} and incorporate the following content: {message_content}. "
-                "Please ensure that no additional contact details are invented."
+                "Ensure no placeholder text (such as [brokerage_name]) is used and do not invent additional contact details."
             )
-        },
-        {
-            "role": "user",
-            "content": "Please generate the email message."
         }
     ]
+
     completion = client.chat.completions.create(
         model="gpt-4o",
         temperature=0.4,
@@ -204,13 +208,15 @@ def draft_email_message_via_ai(user, lead, message_content):
 
 def draft_email_via_ai(user, meeting_type, meeting_time, additional_description, meeting_details):
     """
-    Calls the OpenAI Chat API to generate a custom, professional HTML-formatted email invitation.
+    Uses the OpenAI Chat API to generate a custom, professional HTML-formatted email invitation.
 
-    The email will include:
-      - A greeting like: "Hello, this is <b>{user.name}</b> from <b>{user.brokerage_name}</b>."
-      - Meeting type and time details.
-      - Additional meeting details as provided.
-      - Proper HTML formatting (with <b> tags for emphasis).
+    The invitation should:
+      - Begin with a greeting like: "Hello, this is <b>{user.name}</b> from <b>{user.brokerage_name}</b>."
+      - Clearly state the meeting type and time.
+      - Include any additional meeting details provided.
+      - Emphasize key details using <b> tags.
+
+    Do not use any placeholder text (such as [brokerage_name]) and do not invent extra contact details.
     """
     messages = [
         {
@@ -218,24 +224,20 @@ def draft_email_via_ai(user, meeting_type, meeting_time, additional_description,
             "content": "You are a professional email assistant who drafts HTML-formatted email invitations."
         },
         {
-            "role": "developer",
-            "content": (
-                f"Draft a professional HTML-formatted email invitation for a {meeting_type} meeting. with details: {meeting_details}"
-                f"Include a greeting that says: 'Hello, this is <b>{user.name}</b> from <b>{user.brokerage_name}</b>.' "
-                f"Then mention that we are scheduling a {meeting_type} meeting at "
-                f"{meeting_time.strftime('%I:%M %p on %B %d, %Y')}. "
-                f"Include the following details: {additional_description}. "
-                "Ensure that key details are emphasized using <b> tags and that the tone is friendly and professional."
-            )
-        },
-        {
             "role": "user",
-            "content": "Please generate the email invitation."
+            "content": (
+                f"Draft a professional HTML-formatted email invitation for a {meeting_type} meeting with the following details: {meeting_details}. "
+                f"Begin with a greeting like: 'Hello, this is <b>{user.name}</b> from <b>{user.brokerage_name}</b>.' "
+                f"Then mention that we are scheduling a {meeting_type} meeting at {meeting_time.strftime('%I:%M %p on %B %d, %Y')}. "
+                f"Incorporate the following additional details: {additional_description}. "
+                "Ensure key details are emphasized using <b> tags, and do not include any placeholder text such as [brokerage_name]."
+            )
         }
     ]
 
     completion = client.chat.completions.create(
         model="gpt-4o",
+        temperature=0.4,
         messages=messages
     )
     message_content = completion.choices[0].message.content.strip()
@@ -1023,6 +1025,7 @@ async def initiate_call(
                         "lead_name": contact.name,
                         "lead_id": str(contact.id),
                         "user_id": str(data['user_id']),
+                        "bot_name": getattr(user_record, "bot_name", "N/A"),
                         "brokerage_name": getattr(user_record, "brokerage_name", "N/A"),
                         "communication_id": str(communication.id),
                         "additional_info": data.get('discussion_points', '')
