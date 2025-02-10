@@ -1236,7 +1236,7 @@ async def send_message(
                         if integration_record and integration_record.credentials.get("email"):
                             sender_email = integration_record.credentials.get("email")
                     # Send the email using your email-sending function
-                    send_success = send_email_notification(credentials, sender_email, "mayowa2003ade@gmail.com",
+                    send_success = send_email_notification(credentials, sender_email, lead.email,
                                                            event_details)
                     print("Email sending status:", send_success)
 
