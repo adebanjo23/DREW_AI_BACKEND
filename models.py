@@ -13,6 +13,7 @@ class User(Base):
     password = Column(String, nullable=False)
     phone = Column(String)
     brokerage_name = Column(String)
+    drew_name = Column(String)
     role = Column(String, default='user')
     created_at = Column(DateTime, default=datetime.utcnow)
     is_active = Column(Boolean, default=False)

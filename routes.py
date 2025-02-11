@@ -972,15 +972,23 @@ async def initiate_call(
         # Define background task for call processing
         def background_call_process(db: Session):
             try:
-                # Create a Drew–Lead Communication record for the call
+                # Check if any previous Drew–Lead communication exists for this lead.
+                existing_comm = db.query(DrewLeadCommunication).filter(
+                    DrewLeadCommunication.lead_id == contact.id
+                ).first()
+                first_interaction = "true" if existing_comm is None else "false"
+
+                # Prepare the details for the communication record (if you still want to store them)
                 communication_details = {
                     "notes": data.get('discussion_points', 'Call initiated'),
                     "call_time": call_time.isoformat(),
                 }
+
+                # Create a Drew–Lead Communication record for the call
                 communication = DrewLeadCommunication(
                     user_id=data['user_id'],
                     lead_id=contact.id,
-                    drew_id="agent_drew",
+                    drew_id="agent_drew",  # You may keep this value if needed for your records.
                     type="CALL",
                     status="COMPLETED",
                     details=communication_details
@@ -1000,15 +1008,13 @@ async def initiate_call(
 
                 db.commit()
 
-                # Retrieve the user record to get the brokerage name
+                # Retrieve the user record for additional details (like bot and brokerage name)
                 user_record = db.query(User).get(data['user_id'])
-
-                override_agent_id = "agent_6467d8b24bd7e6990475ef462b"  # set a default value
+                override_agent_id = "agent_6467d8b24bd7e6990475ef462b"  # Default value
                 if user_record.drew_voice_accent:
-                    override_agent_id = user_record.drew_voice_accent.get("outbound_drew_id",
-                                                                          "agent_6467d8b24bd7e6990475ef462b")
+                    override_agent_id = user_record.drew_voice_accent.get("outbound_drew_id", override_agent_id)
 
-                # Prepare payload for the webhook POST request
+                # Prepare payload for the webhook POST request, including the first_interaction flag
                 webhook_url = "https://services.leadconnectorhq.com/hooks/jyPDXTf3YpjI9G74bRCW/webhook-trigger/46adfe70-c715-405a-9421-ba07be3d2434"
                 webhook_headers = {
                     "Content-Type": "application/json",
@@ -1025,19 +1031,21 @@ async def initiate_call(
                         "lead_name": contact.name,
                         "lead_id": str(contact.id),
                         "user_id": str(data['user_id']),
-                        "bot_name": getattr(user_record, "bot_name", "N/A"),
+                        "bot_name": getattr(user_record, "drew_name", "N/A"),
                         "brokerage_name": getattr(user_record, "brokerage_name", "N/A"),
                         "communication_id": str(communication.id),
-                        "additional_info": data.get('discussion_points', '')
+                        "additional_info": data.get('discussion_points', ''),
+                        "first_interaction": first_interaction
                     }
                 }
-                # Send the POST request to the webhook
                 response = requests.post(webhook_url, headers=webhook_headers, json=payload)
                 print("Webhook response status:", response.status_code, response.text)
 
             except Exception as e:
                 db.rollback()
                 print(f"Error in background call process: {str(e)}")
+            finally:
+                db.close()
 
         # Add background task (using a new SessionLocal instance)
         background_tasks.add_task(background_call_process, SessionLocal())
@@ -1089,6 +1097,7 @@ async def initiate_call(
                 "error_details": str(e)
             }
         )
+
 
 
 @router.post("/send_message")
